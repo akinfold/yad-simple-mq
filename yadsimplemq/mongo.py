@@ -49,17 +49,20 @@ class MongoMessageQueue(BaseMessageQueue):
 
         :param message: Message to publish.
         :param routing_key: Routing key allowing to control which workers will execute task.
+        :return: Published Message instance with updated id.
         """
         self.connect()
         _ = self._get_field_name
-        message.update({
+        raw_msg = message.body.copy()
+        raw_msg.update({
             _('routing_key'): routing_key,
             _('is_fetched'): False,
             _('is_fetched_since'): None,
             _('is_acknowledged'): False,
             _('is_acknowledged_since'): None,
         })
-        self._collection.insert(message)
+        message.id = self._collection.insert(raw_msg)
+        return message
 
     def acknowledge(self, message):
         """Acknowledge message.
