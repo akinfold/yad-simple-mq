@@ -14,7 +14,7 @@ class BaseMessageQueue(object):
         self.broker_url = broker_url
         self.exchange = exchange
         self.broker_args = args
-        self.broker_kwqrga = kwargs
+        self.broker_kwargs = kwargs
 
     def connect(self):
         """Open connection with message queue backend if it's doesn't.
