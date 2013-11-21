@@ -2,6 +2,12 @@
 DEFAULT_ROUTING_KEY = 'yadsimplemq.tasks'
 
 
+class Message(object):
+    def __init__(self, id='', body=None):
+        self.id = id
+        self.body = body or {}
+
+
 class BaseMessageQueue(object):
     def __init__(self, broker_url, exchange, *args, **kwargs):
         """Create new message queue.
@@ -29,24 +35,25 @@ class BaseMessageQueue(object):
     def publish(self, message, routing_key=DEFAULT_ROUTING_KEY):
         """Publish new message to queue.
 
-        :param message: Message to publish.
+        :param message: Instance of Message to publish.
         :param routing_key: Routing key allowing to control which workers will execute task.
+        :return: Published Message instance with updated id.
         """
         raise NotImplementedError('Must be implemented in subclasses.')
 
-    def fetch(self, routing_key=DEFAULT_ROUTING_KEY):
-        """Fetch message from queue.
+    def acknowledge(self, message):
+        """Acknowledge message.
 
-        :param routing_key: Routing key allowing to control which workers will execute task.
+        :param message: Instance of Message or message id.
         """
         raise NotImplementedError('Must be implemented in subclasses.')
 
     def consume(self, routing_key=DEFAULT_ROUTING_KEY):
-        """Return generator fetching messages from queue.
+        """Return generator fetching Messages from queue.
 
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
-        return (message for message in self.fetch(routing_key))
+        raise NotImplementedError('Must be implemented in subclasses.')
 
 
 class BaseTask(object):
@@ -58,6 +65,7 @@ class BaseTask(object):
         """
         self.args = arsg
         self.kwargs = kwargs
+        self.id = ''
 
     @classmethod
     def get_fqname(cls):
@@ -104,15 +112,11 @@ class TaskQueue(object):
         :param kwargs: Keyword arguments for task.
         """
         routing_key = kwargs.pop('routing_key', DEFAULT_ROUTING_KEY)
-        message = {
+        message = Message(body={
             'name': name,
             'args': args,
             'kwargs': kwargs,
-            'in_progress': False,
-            'in_progress_since': None,
-            'done': False,
-            'done_since': None,
-        }
+        })
         self.backend.publish(message, routing_key)
 
     def add_task(self, task, routing_key=DEFAULT_ROUTING_KEY):
@@ -123,12 +127,13 @@ class TaskQueue(object):
         """
         self.add_task_by_name(task.get_fqname(), routing_key, *task.args, **task.kwargs)
 
-    def raw_fetch(self, routing_key=DEFAULT_ROUTING_KEY):
-        """Fetch and return raw task from queue.
+    def done(self, task):
+        """Report that task successfully done.
 
-        :param routing_key: Routing key allowing to control which workers will execute task.
+        :param task: Instance of BaseTask subclass or task id.
         """
-        return self.backend.fetch(routing_key)
+        task_id = task.id if isinstance(task, BaseTask) else task
+        raise self.backend.acknowledge(task_id)
 
     @staticmethod
     def _load_cls(name):
@@ -141,9 +146,15 @@ class TaskQueue(object):
             self._task_cache[name] = self._load_cls(name)
         return self._task_cache[name]
 
-    def fetch_task(self, routing_key=DEFAULT_ROUTING_KEY):
-        """Fetch task and return its initialized instance.
+    def _task_from_message(self, message):
+        cls = self._load_task(message.body['name'])
+        task = cls(message.body['args'], message.body['kwargs'])
+        task.id = message.id
+        return task
+
+    def consume(self, routing_key=DEFAULT_ROUTING_KEY):
+        """Return generator fetching Tasks from queue.
+
+        :param routing_key: Routing key allowing to control which workers will execute task.
         """
-        raw_task = self.raw_fetch(routing_key)
-        cls = self._load_task(raw_task['name'])
-        return cls(raw_task['args'], raw_task['kwargs'])
+        return (self._task_from_message(m) for m in self.backend.consume(routing_key))
