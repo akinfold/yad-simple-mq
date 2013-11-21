@@ -117,7 +117,7 @@ class TaskQueue(object):
             'args': args,
             'kwargs': kwargs,
         })
-        self.backend.publish(message, routing_key)
+        return self.backend.publish(message, routing_key).id
 
     def add_task(self, task, routing_key=DEFAULT_ROUTING_KEY):
         """Add new task to queue.
@@ -125,7 +125,8 @@ class TaskQueue(object):
         :param task: Fully initialized and ready to run instance of subclass of BaseTask.
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
-        self.add_task_by_name(task.get_fqname(), routing_key, *task.args, **task.kwargs)
+        task.id = self.add_task_by_name(task.get_fqname(), routing_key, *task.args, **task.kwargs)
+        return task
 
     def done(self, task):
         """Report that task successfully done.
