@@ -49,7 +49,7 @@ class BaseMessageQueue(object):
         raise NotImplementedError('Must be implemented in subclasses.')
 
     def consume(self, routing_key=DEFAULT_ROUTING_KEY):
-        """Return generator fetching Messages from queue.
+        """Generator fetching Messages from queue.
 
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
