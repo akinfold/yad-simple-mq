@@ -50,6 +50,7 @@ class MongoMessageQueue(BaseMessageQueue):
         :param message: Message to publish.
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
+        self.connect()
         _ = self._get_field_name
         message.update({
             _('routing_key'): routing_key,
@@ -65,6 +66,7 @@ class MongoMessageQueue(BaseMessageQueue):
 
         :param message: Instance of Message or message id.
         """
+        self.connect()
         message_id = message.id if isinstance(message, Message) else message
         _ = self._get_field_name
         self._collection.update({'_id': message_id},
@@ -107,6 +109,7 @@ class MongoMessageQueue(BaseMessageQueue):
 
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
+        self.connect()
         msg = self._fetch_message(routing_key)
         while msg:
             yield msg
