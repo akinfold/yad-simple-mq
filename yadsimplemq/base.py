@@ -73,7 +73,7 @@ class BaseTask(object):
         """
         return '%s.%s' % (cls.__module__, cls.__name__)
 
-    def _run(self, *args, **kwargs):
+    def run(self, *args, **kwargs):
         """Execute exact work. Should be overridden in subclasses.
         WARNING: Do not call this method directly, instead use apply() method.
 
@@ -89,9 +89,9 @@ class BaseTask(object):
         :param kwargs: Keyword arguments for task. Will override default arguments passed to __init__ if specified.
         """
         if args or kwargs:
-            return self._run(*args, **kwargs)
+            return self.run(*args, **kwargs)
         else:
-            return self._run(*self.args, **self.kwargs)
+            return self.run(*self.args, **self.kwargs)
 
 
 class TaskQueue(object):
@@ -125,7 +125,7 @@ class TaskQueue(object):
         :param task: Fully initialized and ready to run instance of subclass of BaseTask.
         :param routing_key: Routing key allowing to control which workers will execute task.
         """
-        task.id = self.add_task_by_name(task.get_fqname(), routing_key, *task.args, **task.kwargs)
+        task.id = self.add_task_by_name(task.get_fqname(), routing_key=routing_key, *task.args, **task.kwargs)
         return task
 
     def done(self, task):
@@ -149,7 +149,7 @@ class TaskQueue(object):
 
     def _task_from_message(self, message):
         cls = self._load_task(message.body['name'])
-        task = cls(message.body['args'], message.body['kwargs'])
+        task = cls(*message.body['args'], **message.body['kwargs'])
         task.id = message.id
         return task
 
